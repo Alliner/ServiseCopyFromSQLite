@@ -24,9 +24,6 @@ uses MainServiceThread, SQLite3,{ SQLite3Utils,} SQLite3Wrap;
 
 procedure ThreadCopyData.Execute;
 var
-
-
-
   lastTime:string;
   ini:TIniFile;
   countNewStr,i:integer;
@@ -40,30 +37,30 @@ try
   try
     ini:=TIniFile.Create(PathToEXE+'Devices.ini');
     DeveuiList:=TStringList.Create;
-    ini.ReadSections(DeveuiList); //считывание имен секций (=deveui)
+    ini.ReadSections(DeveuiList); //СЃС‡РёС‚С‹РІР°РЅРёРµ РёРјРµРЅ СЃРµРєС†РёР№ (=deveui)
 
-    //пройдемся по всем устройствам, указанным в ini файле
+    //РїСЂРѕР№РґРµРјСЃСЏ РїРѕ РІСЃРµРј СѓСЃС‚СЂРѕР№СЃС‚РІР°Рј, СѓРєР°Р·Р°РЅРЅС‹Рј РІ ini С„Р°Р№Р»Рµ
     for i:=0 to DeveuiList.Count-1 do begin
-    //если у них включен режим слежения
+    //РµСЃР»Рё Сѓ РЅРёС… РІРєР»СЋС‡РµРЅ СЂРµР¶РёРј СЃР»РµР¶РµРЅРёСЏ
     if (ini.ReadInteger(DeveuiList[i],'status',0)=1) then begin
     countNewStr:=0;
     lasttime:='0';
-    //читаем, куда записать
+    //С‡РёС‚Р°РµРј, РєСѓРґР° Р·Р°РїРёСЃР°С‚СЊ
     insertText:='Insert into '+ini.ReadString(DeveuiList[i],'namedb','null')+' VALUES';
       try
-      //открываем базу с данными
+      //РѕС‚РєСЂС‹РІР°РµРј Р±Р°Р·Сѓ СЃ РґР°РЅРЅС‹РјРё
         DB := TSQLite3Database.Create;
         try
           DB.Open(PathToDB+'yourDB.db');
-          //отбираем нужные записи
+          //РѕС‚Р±РёСЂР°РµРј РЅСѓР¶РЅС‹Рµ Р·Р°РїРёСЃРё
           Stmt := DB.Prepare('SELECT HEX(data), time from datafromdev where '+
-          '(time>'''+ini.ReadString(DeveuiList[i],'time','0')+''') '+   //время последней записи
-          'and (deveui='''+DeveuiList[i]+''') '+   //имя устройства
+          '(time>'''+ini.ReadString(DeveuiList[i],'time','0')+''') '+   //РІСЂРµРјСЏ РїРѕСЃР»РµРґРЅРµР№ Р·Р°РїРёСЃРё, РєРѕС‚РѕСЂР°СЏ СѓР¶Рµ Р±С‹Р»Р° СЃРєРѕРїРёСЂРѕРІР°РЅР°
+          'and (deveui='''+DeveuiList[i]+''') '+   //РёРјСЏ СѓСЃС‚СЂРѕР№СЃС‚РІР°
           'and (data is not null) '+
           ' ORDER BY time ');
 
           try
-            //пройдемся по записям и соберем текст запроса
+            //РїСЂРѕР№РґРµРјСЃСЏ РїРѕ Р·Р°РїРёСЃСЏРј Рё СЃРѕР±РµСЂРµРј С‚РµРєСЃС‚ Р·Р°РїСЂРѕСЃР°
             while Stmt.Step = SQLITE_ROW do begin
                 insertText:=insertText+',('+
                 'DATEADD(millisecond, '+intToStr(Stmt.Columnint64(1) mod 1000)+', DATEADD(s, '+
@@ -71,20 +68,20 @@ try
                 ','+IntToStr(StrToInt('$'+ trim(copy(Stmt.ColumnText(0),31,2)+copy(Stmt.ColumnText(0),29,2))))+')';
                 lasttime:=Stmt.ColumnText(1);
                 countNewStr:=countNewStr+1;
-                //если набралось уже 100 записей для вставки, то запишем их
-                //обнулим число строк, заново сделаем начало запроса и
-                //продолжим набирать записи
+                //РµСЃР»Рё РЅР°Р±СЂР°Р»РѕСЃСЊ СѓР¶Рµ 100 Р·Р°РїРёСЃРµР№ РґР»СЏ РІСЃС‚Р°РІРєРё, С‚Рѕ Р·Р°РїРёС€РµРј РёС…
+                //РѕР±РЅСѓР»РёРј С‡РёСЃР»Рѕ СЃС‚СЂРѕРє, Р·Р°РЅРѕРІРѕ СЃРґРµР»Р°РµРј РЅР°С‡Р°Р»Рѕ Р·Р°РїСЂРѕСЃР° Рё
+                //РїСЂРѕРґРѕР»Р¶РёРј РЅР°Р±РёСЂР°С‚СЊ Р·Р°РїРёСЃРё
                 if (countNewStr Mod 100)=0 then begin
                   WriteIntoSQL(insertText, DeveuiList[i], countNewStr);
                   insertText:= 'Insert into '+ini.ReadString(DeveuiList[i],'namedb','null')+' VALUES';
                   countNewStr:=0;
                   try
-                    //запишем время последнего записанного сообщения
+                    //Р·Р°РїРёС€РµРј РІСЂРµРјСЏ РїРѕСЃР»РµРґРЅРµРіРѕ СЃРѕРѕР±С‰РµРЅРёСЏ
                     ini.WriteString(DeveuiList[i],'time',lasttime);
                   except
                     on e:exception do begin
                       today := Now;
-                      WriteLog(DateToStr(today)+'  '+TimeToStr(today)+' : Не удалось записать данные о времени в ini файл: '+e.Message);
+                      WriteLog(DateToStr(today)+'  '+TimeToStr(today)+' : РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РїРёСЃР°С‚СЊ РґР°РЅРЅС‹Рµ Рѕ РІСЂРµРјРµРЅРё РІ ini С„Р°Р№Р»: '+e.Message);
                     end; //on exp
                   end;//try write ini
                 end; //if str=100
@@ -92,8 +89,8 @@ try
           finally
             Stmt.Free;
           end; //try while
-            //когда закончили собирать запрос для устройства, если были найдены
-            //записи, то отправим их
+            //РєРѕРіРґР° Р·Р°РєРѕРЅС‡РёР»Рё СЃРѕР±РёСЂР°С‚СЊ Р·Р°РїСЂРѕСЃ РґР»СЏ СѓСЃС‚СЂРѕР№СЃС‚РІР°, РµСЃР»Рё Р±С‹Р»Рё РЅР°Р№РґРµРЅС‹
+            //Р·Р°РїРёСЃРё, С‚Рѕ РѕС‚РїСЂР°РІРёРј РёС…
             if (countNewStr<>0) then begin
 
               WriteIntoSQL(insertText, DeveuiList[i], countNewStr);
@@ -102,12 +99,12 @@ try
               except
                 on e:exception do begin
                   today := Now;
-                  WriteLog(DateToStr(today)+'  '+TimeToStr(today)+' : Не удалось записать данные о времени в ini файл: '+e.Message);
+                  WriteLog(DateToStr(today)+'  '+TimeToStr(today)+' : РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РїРёСЃР°С‚СЊ РґР°РЅРЅС‹Рµ Рѕ РІСЂРµРјРµРЅРё РІ ini С„Р°Р№Р»: '+e.Message);
                 end;
               end;
             //end else begin
               //today := Now;
-              //WriteLog(DateToStr(today)+'  '+TimeToStr(today)+' : Нет новых записей для '+DeveuiList[i]);
+              //WriteLog(DateToStr(today)+'  '+TimeToStr(today)+' : РќРµС‚ РЅРѕРІС‹С… Р·Р°РїРёСЃРµР№ РґР»СЏ '+DeveuiList[i]);
             end;//if count<>0
         finally
           DB.Free;
@@ -115,7 +112,7 @@ try
       except
         on e:exception do begin
           today := Now;
-          WriteLog(DateToStr(today)+'  '+TimeToStr(today)+' : Не удалось подключиться к базе данных: '+e.Message);
+          WriteLog(DateToStr(today)+'  '+TimeToStr(today)+' : РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕРґРєР»СЋС‡РёС‚СЊСЃСЏ Рє Р±Р°Р·Рµ РґР°РЅРЅС‹С…: '+e.Message);
         end;
       end;
     end;
@@ -126,7 +123,7 @@ try
   except
     on e:exception do begin
       today := Now;
-      WriteLog(DateToStr(today)+'  '+TimeToStr(today)+' : Не удалось прочитать данные из ini файла: '+e.Message);
+      WriteLog(DateToStr(today)+'  '+TimeToStr(today)+' : РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРѕС‡РёС‚Р°С‚СЊ РґР°РЅРЅС‹Рµ РёР· ini С„Р°Р№Р»Р°: '+e.Message);
     end;
   end;
 finally
@@ -137,10 +134,9 @@ end;
 procedure ThreadCopyData.WriteIntoSQL(text, devname :string; count :integer);
 begin
   ADOQuery1 := TADOQuery.Create(nil);
-  //установим параметры
+  //СѓСЃС‚Р°РЅРѕРІРёРј РїР°СЂР°РјРµС‚СЂС‹
   with ADOQuery1 do begin
     ConnectionString := 'FILE NAME=' + PathToEXE + 'Connection.udl';
-    CommandTimeout := 3;
     CommandTimeout := 3;
     CursorLocation := clUseClient;
     Tag := 0;
@@ -156,7 +152,7 @@ begin
   except
     on e:exception do begin
       today := Now;
-      WriteLog(DateToStr(today)+'  '+TimeToStr(today)+' : Ошибка записи данных: '+e.Message);
+      WriteLog(DateToStr(today)+'  '+TimeToStr(today)+' : РћС€РёР±РєР° Р·Р°РїРёСЃРё РґР°РЅРЅС‹С…: '+e.Message);
     end;
   end;
 
